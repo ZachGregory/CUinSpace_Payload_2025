@@ -1,1 +1,1 @@
-# CUinSpace_Payload_2025
+# CU in Space Payload 2025
