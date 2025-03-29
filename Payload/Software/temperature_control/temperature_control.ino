@@ -89,9 +89,9 @@ void detectFaultySensors() {
 
   // Sort to find median
   int minIndex;
-  for (int i = 0; i< numOfThermistors; i++){
+  for (int i = 0; i < numOfThermistors; i++){
     minIndex = i;
-    for (int j = i+1; j< numOfThermistors; j++){
+    for (int j = i+1; j < numOfThermistors; j++){
       if (sorted[minIndex] > sorted[j]){
         minIndex = j;
       }
@@ -103,7 +103,7 @@ void detectFaultySensors() {
 
   float median = sorted[numOfThermistors/2];
 
-  for (int i = 0; i< numOfThermistors; i++){
+  for (int i = 0; i < numOfThermistors; i++){
     if(abs(temp[i] - median) > errorTolerance){ // Adjust accordingly
       thermistorIsValid[i] = false; // Mark as faulty
       Serial.print("Faulty Sensor Detected: Thermistor ");
