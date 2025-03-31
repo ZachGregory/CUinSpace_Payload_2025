@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
+
 #include "Adafruit_HTU21DF.h" // Humidity sensor
 #include <Adafruit_TMP117.h> // Temperature sensor
 #include <pas-co2-ino.hpp> // CO2 sensor
@@ -24,6 +25,11 @@ calData calib = { 0 };  //Calibration data for IMU
 unsigned long time_last_co2_read;
 Error_t err;
 
+float humidity;
+float temp;
+int16_t co2ppm;
+float acceleration[3];
+float angular_velocity[3];
 
 void setup() {
   Serial.begin(115200);
@@ -53,15 +59,14 @@ void setup() {
 
 void loop() {
   // Get humidity
-  float rel_hum = htu.readHumidity();
+  humidity = htu.readHumidity();
 
   // Get temperature
   sensors_event_t temp_sensor; // create an empty event to be filled
   tmp.getEvent(&temp_sensor); //fill the empty event object with the current measurements
-  float temp = temp_sensor.temperature;
+  temp = temp_sensor.temperature;
 
   // Get CO2 ppm
-  int16_t co2ppm;
   if (millis() - time_last_co2_read > PERIODIC_MEAS_INTERVAL_IN_SECONDS*1000){ // Wait for the value to be ready
     err = co2.getCO2(co2ppm);
     if (XENSIV_PASCO2_OK != err){
@@ -80,7 +85,9 @@ void loop() {
 
   IMU.update();
   IMU.getAccel(&accelData);
+  acceleration[0] = accelData.accelX; acceleration[1] = accelData.accelY; acceleration[2] = accelData.accelZ;
   IMU.getGyro(&gyroData);
+  angular_velocity[0] = gyroData.gyroX; angular_velocity[1] = gyroData.gyroY; angular_velocity[2] = gyroData.gyroZ;
 
   delay(500);
 }
