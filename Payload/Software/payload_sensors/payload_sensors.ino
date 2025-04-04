@@ -1,93 +1,123 @@
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
+#include "Adafruit_BME680.h"
+#include "ICM_20948.h"
 
-#include "Adafruit_HTU21DF.h" // Humidity sensor
-#include <Adafruit_TMP117.h> // Temperature sensor
-#include <pas-co2-ino.hpp> // CO2 sensor
-#include "FastIMU.h" // IMU sensor
+#define SEALEVELPRESSURE_HPA (1013.25)
+#define AD0_VAL 1
 
-#define I2C_FREQ_HZ  400000                     
-#define PERIODIC_MEAS_INTERVAL_IN_SECONDS  10 /* demo-mode value; not recommended for long-term measurements */
-// #define PERIODIC_MEAS_INTERVAL_IN_SECONDS 60L /* specification value for stable operation (uncomment for long-time-measurements) */
-#define PRESSURE_REFERENCE  900
+Adafruit_BME680 bme(&Wire);
+ICM_20948_I2C myICM;
 
-#define IMU_ADDRESS 0x68    //Change to the address of the IMU
-//#define PERFORM_CALIBRATION //Calibration method not added here
-MPU6500 IMU;               //Change to the name of any supported IMU! 
+String debugMsg;
 
-Adafruit_HTU21DF htu = Adafruit_HTU21DF();
-Adafruit_TMP117 tmp;
-PASCO2Ino co2;
-AccelData accelData; 
-GyroData gyroData;
-calData calib = { 0 };  //Calibration data for IMU
+const float vcc = 5.0;
+const int adcMax = 1023;
+const float sens = 0.185;  // 5A
+float current = 0;
 
-unsigned long time_last_co2_read;
-Error_t err;
+float getAverageCurrent(int nSamples) {
+  float val = 0;
+  for (int i = 0; i < nSamples; i++) {
+    val += analogRead(A0);
+    delay(1);
+  }
+  float avgOutput = val / adcMax / nSamples;
+  return (vcc / 2 - vcc * avgOutput) / sens;
+}
 
-float humidity;
-float temp;
-int16_t co2ppm;
-float acceleration[3];
-float angular_velocity[3];
+icm_20948_DMP_data_t ICMdata;
 
 void setup() {
   Serial.begin(115200);
   while (!Serial) delay(10); // ensure Serial is setup
 
-  /* Initialize the i2c interface used by the sensor */
   Wire.begin();
-  Wire.setClock(I2C_FREQ_HZ);
+  Wire.setClock(400000);
 
-  // initalize sensors
-  if (!htu.begin()) Serial.println("Error initializing HTU sensor");
-  if (!tmp.begin()) Serial.println("Error initializing TMP sensor");
+  // BME sensor initialization
+  if (!bme.begin()) { Serial.println("Failed to initialize BME");}
+  // Set up oversampling and filter initialization
+  bme.setTemperatureOversampling(BME680_OS_8X);
+  bme.setHumidityOversampling(BME680_OS_2X);
+  bme.setPressureOversampling(BME680_OS_4X);
+  bme.setIIRFilterSize(BME680_FILTER_SIZE_3);
+  bme.setGasHeater(320, 150); // 320*C for 150 ms
 
-  err = co2.begin();
-  if (XENSIV_PASCO2_OK != err) Serial.println("Error initializing CO2 sensor");
-  err = co2.setPressRef(PRESSURE_REFERENCE); //Set reference pressure
-  if (XENSIV_PASCO2_OK != err) Serial.println("Refrence pressure error CO2 sensor");
-  err = co2.startMeasure(PERIODIC_MEAS_INTERVAL_IN_SECONDS); // Configure sensor ro measure every 60 seconds
-  if (XENSIV_PASCO2_OK != err) Serial.println("Error with start measure CO2 sensor");  
-
-  err = IMU.init(calib, IMU_ADDRESS);
-  if (err != 0) Serial.println("Error initializing IMU sensor");
-
-  delay(1000); // Give time for everything to setup
-  time_last_co2_read = millis();
+  // ICM sensor initialization
+  myICM.begin(Wire, AD0_VAL);
+  if (myICM.status != ICM_20948_Stat_Ok){Serial.println("Failed to initialize ICM");}
+  if (myICM.initializeDMP() != ICM_20948_Stat_Ok) {Serial.println("Failed to initialize DMP");}
 }
 
 void loop() {
-  // Get humidity
-  humidity = htu.readHumidity();
+  debugMsg = "Debug Errors: ";
+  if (!bme.performReading()){debugMsg += "Error reading BME\t";}
 
-  // Get temperature
-  sensors_event_t temp_sensor; // create an empty event to be filled
-  tmp.getEvent(&temp_sensor); //fill the empty event object with the current measurements
-  temp = temp_sensor.temperature;
+  if (myICM.dataReady()) {
+    if (myICM.readDMPdataFromFIFO(&ICMdata) != ICM_20948_Stat_Ok) {debugMsg += "Error reading ICM\t";}
+  } else {debugMsg += "ICM data not ready\t";}
 
-  // Get CO2 ppm
-  if (millis() - time_last_co2_read > PERIODIC_MEAS_INTERVAL_IN_SECONDS*1000){ // Wait for the value to be ready
-    err = co2.getCO2(co2ppm);
-    if (XENSIV_PASCO2_OK != err){
-      // Retry in case of timing synch mismatch
-      if (XENSIV_PASCO2_ERR_COMM == err){
-        delay(600);
-        err = co2.getCO2(co2ppm);
-        if (XENSIV_PASCO2_OK != err){
-          Serial.print("get co2 error: ");
-          Serial.println(err);
-        }
-      }
-      time_last_co2_read = millis();
-    }
-  }
+  current = getAverageCurrent(100);
 
-  IMU.update();
-  IMU.getAccel(&accelData);
-  acceleration[0] = accelData.accelX; acceleration[1] = accelData.accelY; acceleration[2] = accelData.accelZ;
-  IMU.getGyro(&gyroData);
-  angular_velocity[0] = gyroData.gyroX; angular_velocity[1] = gyroData.gyroY; angular_velocity[2] = gyroData.gyroZ;
+  printData();
+  
+  delay(100);
+}
 
-  delay(500);
+void printData(){
+  Serial.print("Temperature (C):");
+  Serial.print(bme.temperature);
+  Serial.print("\t");
+
+  Serial.print("Pressure (Pa):");
+  Serial.print(bme.pressure);
+  Serial.print("\t");
+
+  Serial.print("Humidity (%):");
+  Serial.print(bme.humidity);
+  Serial.print("\t");
+
+  Serial.print("Gas (Ohms):");
+  Serial.print(bme.gas_resistance);
+  Serial.print("\t");
+
+  Serial.print("Altitude (m):");
+  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
+  Serial.print("\t");
+
+  Serial.print("Accel X:");
+  Serial.print((float)ICMdata.Raw_Accel.Data.X); 
+  Serial.print("\t");
+  Serial.print("Accel Y:");
+  Serial.print((float)ICMdata.Raw_Accel.Data.Y); 
+  Serial.print("\t");
+  Serial.print("Accel Z:");
+  Serial.print((float)ICMdata.Raw_Accel.Data.Z); 
+  Serial.print("\t");
+
+  Serial.print("Gyro X:");
+  Serial.print((float)ICMdata.Raw_Gyro.Data.X); 
+  Serial.print("\t");
+  Serial.print("Gyro Y:");
+  Serial.print((float)ICMdata.Raw_Gyro.Data.Y); 
+  Serial.print("\t");
+  Serial.print("Gyro Z:");
+  Serial.print((float)ICMdata.Raw_Gyro.Data.Z); 
+  Serial.print("\t");
+
+  Serial.print("Mag X:");
+  Serial.print((float)ICMdata.Compass.Data.X); 
+  Serial.print("\t");
+  Serial.print("Mag Y:");
+  Serial.print((float)ICMdata.Compass.Data.Y); 
+  Serial.print("\t");
+  Serial.print("Mag Z:");
+  Serial.print((float)ICMdata.Compass.Data.Z); 
+  Serial.print("\t");
+
+  Serial.print("Current (A):");
+  Serial.print(current);
+
+  Serial.println(debugMsg);
 }
