@@ -1,3 +1,4 @@
+#include <math.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include "Adafruit_BME680.h"
@@ -9,12 +10,33 @@
 Adafruit_BME680 bme(&Wire);
 ICM_20948_I2C myICM;
 
+const int RPWM = 6; // Forward digital pin
+const int LPWM = 5; // Reversal digital pin
+
+icm_20948_DMP_data_t ICMdata;
+
 String debugMsg;
 
 const float vcc = 5.0;
 const int adcMax = 1023;
 const float sens = 0.185;  // 5A
 float current = 0;
+
+float idealTemp = 23.0; // Temperature goal
+float tempTolerance = 1.0; // Acceptable range +/-
+
+void controlPeltier(float temperature) {
+  if (temperature > idealTemp + tempTolerance) { // Cooling
+    digitalWrite(RPWM, HIGH);
+    digitalWrite(LPWM, LOW);
+  } else if (temperature < idealTemp - tempTolerance) { // Heating
+    digitalWrite(RPWM, LOW);
+    digitalWrite(LPWM, HIGH);
+  } else { // Idle
+    digitalWrite(RPWM, LOW);
+    digitalWrite(LPWM, LOW);
+  }
+}
 
 float getAverageCurrent(int nSamples) {
   float val = 0;
@@ -26,9 +48,10 @@ float getAverageCurrent(int nSamples) {
   return (vcc / 2 - vcc * avgOutput) / sens;
 }
 
-icm_20948_DMP_data_t ICMdata;
-
 void setup() {
+  pinMode(RPWM, OUTPUT);
+  pinMode(LPWM, OUTPUT);
+
   Serial.begin(115200);
   while (!Serial) delay(10); // ensure Serial is setup
 
@@ -59,6 +82,8 @@ void loop() {
   } else {debugMsg += "ICM data not ready\t";}
 
   current = getAverageCurrent(100);
+
+  controlPeltier(bme.temperature);
 
   printData();
   
