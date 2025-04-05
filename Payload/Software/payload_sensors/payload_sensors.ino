@@ -19,7 +19,7 @@ String debugMsg;
 
 const float vcc = 5.0;
 const int adcMax = 1023;
-const float sens = 0.185;  // 5A
+const float sens = 0.66;  // 30A
 float current = 0;
 
 float idealTemp = 23.0; // Temperature goal
@@ -45,7 +45,7 @@ float getAverageCurrent(int nSamples) {
     delay(1);
   }
   float avgOutput = val / adcMax / nSamples;
-  return (vcc / 2 - vcc * avgOutput) / sens;
+  return (vcc / 2 - vcc * avgOutput) / sens * 10;
 }
 
 void setup() {
