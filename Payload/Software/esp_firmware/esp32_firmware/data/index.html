@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESP32 Payload Telemetry</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="wrap">
+    <h1>ESP32 Payload Telemetry</h1>
+    <div class="ip muted">Connect to AP <b>ESP32-Payload</b> → open <b>http://192.168.4.1</b></div>
+    <div class="grid">
+      <div class="card"><div class="label">Temperature</div><div class="value"><span id="t">--</span><span class="unit">°C</span></div></div>
+      <div class="card"><div class="label">Humidity</div><div class="value"><span id="h">--</span><span class="unit">%</span></div></div>
+      <div class="card"><div class="label">Pressure</div><div class="value"><span id="p">--</span><span class="unit">hPa</span></div></div>
+      <div class="card"><div class="label">Accel (X,Y,Z)</div><div class="value"><span id="ax">--</span>, <span id="ay">--</span>, <span id="az">--</span><span class="unit">g</span></div></div>
+      <div class="card"><div class="label">Uptime</div><div class="value"><span id="up">--</span><span class="unit">s</span></div></div>
+    </div>
+    <div class="small muted">Live via <code>/events</code> (SSE). Snapshot: <code>/api/data</code>.</div>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
