@@ -1,0 +1,12 @@
+:root { font: 16px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, sans-serif; }
+body{margin:0; background:#0b1220; color:#e7eefc;}
+.wrap{max-width:900px; margin:0 auto; padding:24px;}
+h1{font-size:1.6rem; margin:0 0 8px;}
+.ip{opacity:.8; font-size:.9rem; margin-bottom:18px}
+.grid{display:grid; gap:12px; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));}
+.card{background:#121b34; border:1px solid #233257; border-radius:14px; padding:16px; box-shadow:0 6px 20px rgba(0,0,0,.35);}
+.label{opacity:.85; font-size:.9rem; margin-bottom:6px;}
+.value{font-size:2rem; font-weight:700; letter-spacing:0.02em;}
+.unit{opacity:.75; font-size:1rem; margin-left:6px;}
+.small{opacity:.8; font-size:.85rem; margin-top:10px;}
+.muted{opacity:.7}
